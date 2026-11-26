@@ -1,0 +1,143 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pomodoro</title>
+<link rel="stylesheet" href="fonts/pixelify.css">
+<link rel="stylesheet" href="fonts/nunito.css">
+<link rel="stylesheet" href="fonts/hanken.css">
+<link rel="stylesheet" href="style.css">
+<script>
+  // Apply saved theme + scene before first paint so the colours don't flash.
+  (function () {
+    var s = {};
+    try { s = JSON.parse(localStorage.getItem('pomo.settings')) || {}; } catch (e) {}
+    var a = s.appearance || 'system';
+    if (a === 'system') a = matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+    document.documentElement.dataset.theme = a;
+    document.documentElement.dataset.scene = s.scene || 'miner';
+    document.documentElement.dataset.font = s.font || 'pixel';
+  })();
+</script>
+</head>
+<body data-mode="focus">
+
+<div class="corner">
+  <button class="icon-btn" id="themeToggle" title="Switch light/dark" aria-label="Switch light or dark"></button>
+  <button class="icon-btn" id="openSettings" title="Settings" aria-label="Settings">
+    <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+  </button>
+</div>
+
+<main class="stage">
+  <div class="scene-frame">
+    <canvas id="scene" width="128" height="48" aria-hidden="true"></canvas>
+  </div>
+  <div class="progress" id="progress" role="slider" tabindex="0"
+       aria-label="Session progress, drag to move" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+    <div class="progress-track"><div class="progress-fill" id="progressFill"></div></div>
+    <div class="progress-knob" id="progressKnob"></div>
+  </div>
+
+  <div id="time" class="time">25:00</div>
+
+  <div class="modes" role="tablist" aria-label="Session type">
+    <button class="mode" data-mode="focus" role="tab">Focus</button>
+    <button class="mode" data-mode="break" role="tab">Break</button>
+  </div>
+
+  <div class="controls">
+    <button class="icon-btn round" id="reset" title="Restart this session" aria-label="Restart this session">
+      <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v5h5"/></svg>
+    </button>
+    <button id="start" class="primary">Start</button>
+    <button class="icon-btn round" id="skip" title="Skip to the next session" aria-label="Skip to the next session">
+      <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 5l10 7-10 7z"/><path d="M19 5v14"/></svg>
+    </button>
+  </div>
+
+  <p class="stats" id="stats"></p>
+</main>
+
+<div class="overlay" id="settings">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="settingsTitle">
+    <div class="modal-head">
+      <h2 id="settingsTitle">Settings</h2>
+      <button class="icon-btn" id="closeX" aria-label="Close settings">✕</button>
+    </div>
+
+    <section>
+      <h3>Session lengths</h3>
+      <div class="row">
+        <label for="focusMin">Focus</label>
+        <span class="num"><input type="number" id="focusMin" min="1" max="180" inputmode="numeric"> min</span>
+      </div>
+      <div class="row">
+        <label for="breakMin">Break</label>
+        <span class="num"><input type="number" id="breakMin" min="1" max="60" inputmode="numeric"> min</span>
+      </div>
+    </section>
+
+    <section>
+      <h3>Look</h3>
+      <div class="row">
+        <span class="lbl">Scene</span>
+        <div class="segmented" id="sceneSeg">
+          <button class="seg" data-value="miner">Miner</button>
+          <button class="seg" data-value="campfire">Campfire</button>
+          <button class="seg" data-value="plant">Plant</button>
+          <button class="seg" data-value="mountain">Mountain</button>
+        </div>
+      </div>
+      <div class="row">
+        <span class="lbl">Font</span>
+        <div class="segmented" id="fontSeg">
+          <button class="seg" data-value="pixel" style="font-family:'Pixelify Sans'">Pixel</button>
+          <button class="seg" data-value="rounded" style="font-family:Nunito">Rounded</button>
+          <button class="seg" data-value="clean" style="font-family:'Hanken Grotesk'">Clean</button>
+        </div>
+      </div>
+      <div class="row">
+        <span class="lbl">Appearance</span>
+        <div class="segmented" id="appearanceSeg">
+          <button class="seg" data-value="light">Light</button>
+          <button class="seg" data-value="dark">Dark</button>
+          <button class="seg" data-value="system">System</button>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <h3>When a session ends</h3>
+      <div class="row">
+        <span class="lbl">Play a sound
+          <small><button class="link-btn" id="hearFocus">Hear focus end</button> or <button class="link-btn" id="hearBreak">break end</button></small>
+        </span>
+        <label class="switch"><input type="checkbox" id="sound"><span class="slider"></span></label>
+      </div>
+      <div class="row">
+        <span class="lbl">Show a desktop notification<small id="notifHint"></small></span>
+        <label class="switch"><input type="checkbox" id="notify"><span class="slider"></span></label>
+      </div>
+      <div class="row">
+        <span class="lbl">Start the break automatically</span>
+        <label class="switch"><input type="checkbox" id="autoBreak"><span class="slider"></span></label>
+      </div>
+      <div class="row">
+        <span class="lbl">Start the next focus automatically</span>
+        <label class="switch"><input type="checkbox" id="autoFocus"><span class="slider"></span></label>
+      </div>
+    </section>
+
+    <div class="modal-foot">
+      <button class="link-btn" id="resetStats">Clear today's sessions</button>
+      <button class="primary small" id="closeSettings">Done</button>
+    </div>
+  </div>
+</div>
+
+<script src="scenes.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
